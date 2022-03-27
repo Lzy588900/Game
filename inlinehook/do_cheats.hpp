@@ -7,7 +7,7 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx9.h"
-111
+
 IDirect3D9* g_direct3d9 = nullptr;
 D3DPRESENT_PARAMETERS  g_present;
 IDirect3DDevice9* g_directdevice9 = nullptr;
@@ -16,28 +16,85 @@ inline_hook* g_Reset_hook = nullptr;
 inline_hook* g_EndScene_hook = nullptr;
 inline_hook* g_DrawIndexedPrimitive_hook = nullptr;
 
-HRESULT __stdcall self_Reset(IDirect3DDevice9* directdevice9,D3DPRESENT_PARAMETERS* pPresentationParameters)
+WNDPROC g_original_proc = nullptr;
+HRESULT __stdcall self_Reset(IDirect3DDevice9* directdevice9, D3DPRESENT_PARAMETERS* pPresentationParameters)
 {
-	
+
 	g_Reset_hook->restore_address();
 
-
-	HRESULT result=directdevice9->Reset(pPresentationParameters);
+	ImGui_ImplDX9_InvalidateDeviceObjects();
+	HRESULT result = directdevice9->Reset(pPresentationParameters);
+	ImGui_ImplDX9_CreateDeviceObjects();
 
 
 	g_Reset_hook->motify_address();
-
-
 	return result;
+}
+void initialize_imgui(IDirect3DDevice9* directdevice9)
+{
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGui::StyleColorsLight();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.IniFilename = nullptr;
+	io.LogFilename = nullptr;
+	ImGui_ImplWin32_Init(FindWindow("Direct3DWindowClass", nullptr));
+	ImGui_ImplDX9_Init(directdevice9);
+
+}
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK self_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	if (ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam))
+		return true;
+
+	/*if (uMsg = WM_SIZE)
+	{
+		if (g_directdevice9 != NULL && wParam != SIZE_MINIMIZED)
+		{
+			g_present.BackBufferWidth = LOWORD(lParam);
+			g_present.BackBufferHeight = HIWORD(lParam);
+			self_Reset(g_directdevice9, nullptr);
+		}
+	}*/
+
+	return CallWindowProc(g_original_proc, hWnd, uMsg, wParam, lParam);
 }
 HRESULT __stdcall self_EndScene(IDirect3DDevice9* directdevice9)
 {
+	static bool first_call = true;
+	if (first_call)
+	{
+		first_call = false;
+		initialize_imgui(directdevice9);
+		g_original_proc = (WNDPROC)SetWindowLongA(FindWindow("Direct3DWindowClass", nullptr), GWL_WNDPROC, (LONG)self_proc);
+	}
+
 	printf("½øÈëendº¯Êı\n");
+
+
 	g_EndScene_hook->restore_address();
+
+	ImGui_ImplDX9_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+
+	ImGui::Begin("NewWIndow");
+	ImGui::Text("testWindow");
+	ImGui::End();
+
+	ImGui::EndFrame();
+	ImGui::Render();
+	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
+
 	HRESULT result = directdevice9->EndScene();
 	g_EndScene_hook->motify_address();
 	return result;
 }
+
+
+
+
 HRESULT __stdcall self_DrawIndexedPrimitive(IDirect3DDevice9* g_directdevice9, D3DPRIMITIVETYPE type, INT BaseVertexIndex, UINT MinVertexIndex, UINT NumVertices, UINT startIndex, UINT primCount)
 {
 	return 1;
@@ -57,7 +114,8 @@ unsigned __stdcall initalize_d3d9(void* data)
 	g_present.Windowed = TRUE;
 	g_present.SwapEffect = D3DSWAPEFFECT_DISCARD;
 	g_present.BackBufferFormat = D3DFMT_UNKNOWN;
-
+	g_present.AutoDepthStencilFormat = D3DFMT_D16;
+	g_present.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
 	HRESULT result= g_direct3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, FindWindow("Direct3DWindowClass",NULL),
 		D3DCREATE_SOFTWARE_VERTEXPROCESSING,
 		&g_present, &g_directdevice9);
@@ -77,4 +135,6 @@ void un_load()
 {
 	g_Reset_hook->restore_address();
 	g_EndScene_hook->restore_address();
+
+	
 }
