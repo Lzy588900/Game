@@ -5,7 +5,8 @@
 #include <stdio.h>
 #pragma  comment(lib,"d3d9.lib")
 #include "imgui/imgui.h"
-#include "imgui/"
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_dx9.h"
 IDirect3D9* g_direct3d9 = nullptr;
 D3DPRESENT_PARAMETERS  g_present;
 IDirect3DDevice9* g_directdevice9 = nullptr;
