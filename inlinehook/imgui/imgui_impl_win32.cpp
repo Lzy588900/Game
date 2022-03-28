@@ -224,7 +224,7 @@ static void ImGui_ImplWin32_UpdateMousePos()
 {
     ImGui_ImplWin32_Data* bd = ImGui_ImplWin32_GetBackendData();
     ImGuiIO& io = ImGui::GetIO();
-    IM_ASSERT(bd->hWnd != 0);
+	IM_ASSERT(bd->hWnd != 0);
 
     const ImVec2 mouse_pos_prev = io.MousePos;
     io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);

@@ -51,6 +51,9 @@
     <ClInclude Include="imgui\imgui_impl_win32.h">
       <Filter>imgui</Filter>
     </ClInclude>
+    <ClInclude Include="ImWin.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dll_main.cpp">
@@ -76,6 +79,9 @@
     </ClCompile>
     <ClCompile Include="imgui\imgui_impl_win32.cpp">
       <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="ImWin.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
