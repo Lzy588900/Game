@@ -5,5 +5,10 @@
 #include "imgui/imgui_impl_dx9.h"
 
 
+/*
+	* 游戏窗口数据
+	*/
+
+
 void LoadMyWin();
 void DrawOther();

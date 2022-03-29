@@ -8,6 +8,7 @@
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx9.h"
 #include "ImWin.h"
+#include "Matrix/Matrix.h"
 
 IDirect3D9* g_direct3d9 = nullptr;
 D3DPRESENT_PARAMETERS  g_present;
@@ -59,14 +60,16 @@ HRESULT __stdcall self_EndScene(IDirect3DDevice9* directdevice9)
 	static bool first_call = true;
 	if (first_call)
 	{
+
 		first_call = false;
 		initialize_imgui(directdevice9);
 		g_original_proc = (WNDPROC)SetWindowLongA(FindWindow(WindowClass, nullptr), GWL_WNDPROC, (LONG)self_proc);
+		InitData();
 	}
 
-	printf("进入end函数\n");
+	//printf("进入end函数\n");
 
-
+	
 	g_EndScene_hook->restore_address();
 
 	LoadMyWin();
@@ -75,17 +78,17 @@ HRESULT __stdcall self_EndScene(IDirect3DDevice9* directdevice9)
 	g_EndScene_hook->motify_address();
 	return result;
 }
-HRESULT __stdcall self_DrawIndexedPrimitive(IDirect3DDevice9* g_directdevice9, D3DPRIMITIVETYPE type, INT BaseVertexIndex, UINT MinVertexIndex, UINT NumVertices, UINT startIndex, UINT primCount)
-{
-	return 1;
-}
+//HRESULT __stdcall self_DrawIndexedPrimitive(IDirect3DDevice9* g_directdevice9, D3DPRIMITIVETYPE type, INT BaseVertexIndex, UINT MinVertexIndex, UINT NumVertices, UINT startIndex, UINT primCount)
+//{
+//	return 1;
+//}
 unsigned __stdcall initalize_d3d9(void* data)
 {
-//#ifdef _DEBUG
-//	AllocConsole();
-//	SetConsoleTitleA("test");
-//	freopen("CON", "w", stdout);
-//#endif
+#ifdef _DEBUG
+	AllocConsole();
+	SetConsoleTitleA("test");
+	freopen("CON", "w", stdout);
+#endif
 
 	
 	g_direct3d9 = Direct3DCreate9(D3D_SDK_VERSION);
@@ -115,6 +118,5 @@ void un_load()
 {
 	g_Reset_hook->restore_address();
 	g_EndScene_hook->restore_address();
-
 	
 }

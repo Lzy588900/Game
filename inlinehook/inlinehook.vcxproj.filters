@@ -16,6 +16,9 @@
     <Filter Include="imgui">
       <UniqueIdentifier>{02e7499b-623a-4357-a821-7c13ec036488}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Matrix">
+      <UniqueIdentifier>{814c9e2d-ecd3-4d1f-8ec8-5ac5efe49955}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="do_cheats.hpp">
@@ -54,6 +57,9 @@
     <ClInclude Include="ImWin.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Matrix\Matrix.h">
+      <Filter>Matrix</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dll_main.cpp">
@@ -82,6 +88,9 @@
     </ClCompile>
     <ClCompile Include="ImWin.cpp">
       <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Matrix\matrix.cpp">
+      <Filter>Matrix</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
