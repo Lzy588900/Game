@@ -10,5 +10,4 @@
 	*/
 
 
-void LoadMyWin();
 void DrawOther();

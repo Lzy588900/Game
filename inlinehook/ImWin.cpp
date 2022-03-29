@@ -1,29 +1,9 @@
 #include "ImWin.h"
-#include "Matrix/Matrix.h"
+//#include "Matrix/Matrix.h"
 
 
 
-void LoadMyWin()
-{
-	ImDrawList* draw_list = ImGui::GetForegroundDrawList();
 
-	ImGui_ImplDX9_NewFrame();
-	ImGui_ImplWin32_NewFrame();
-	ImGui::NewFrame();
-	
-	ImGui::Begin(u8"内部绘制");
-	ImGui::Text(u8"内部绘制");
-
-	DrawOther();//绘制方框
-	
-	ImGui::End();
-	ImGui::EndFrame();
-	ImGui::Render();
-	
-	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
-
-
-}
 
 void DrawOther() {
 	//颜色

@@ -9,7 +9,7 @@
 
 
 	
-	BOOL InitData();
+	BOOL InitData(HANDLE *hProcess, HANDLE *hMoudle, HWND *hWnd);
 	DWORD GetProcessID(const char* processName);
 	HMODULE GetProcessModuleHandle(DWORD pid, CONST TCHAR* moduleName);
 	void CreateOverlayWindow();

@@ -10,3 +10,4 @@ void check_error(bool state,const char*str=nullptr)
 	MessageBox(nullptr,buffer,nullptr,MB_OK|MB_ICONHAND);
 	exit(-1);
 }
+
