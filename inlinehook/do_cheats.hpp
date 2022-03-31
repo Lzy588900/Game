@@ -26,15 +26,58 @@ inline_hook* g_DrawIndexedPrimitive_hook = nullptr;
 
 LPCSTR WindowClass = "Valve001";//Direct3DWindowClass Valve001
 
-HWND hWnd = NULL;   //窗口句柄
+//HWND hWnd = NULL;   //窗口句柄
 HANDLE hProcess = NULL;//进程句柄
 DWORD processID = NULL;
 HANDLE hMoudle[4] = {};//存储需要用到的模块地址 0 server 1 engine 2client
 RECT winRect = {};
-
+ImDrawList* draw_list;
 WNDPROC g_original_proc = nullptr;
-namespace matrix {
+static HWND window = NULL;
+bool first_call = true;
+bool show = true;
+bool Cursor = false;
+struct Vctors2
+{
+	float x, y;
+	int TeamFlag, Healthy;
+	int BoxWidth, BoxHeight;
+	float Distance;
+};
+struct Enemy {
+	int hp;
+	float pos[3];//世界坐标
+	Vctors2 screen;//屏幕坐标
+	float headBoneWord[3];//头部骨骼世界坐标
+	float headBoneScreen[3];//头部骨骼世界坐标
+}personArray[10];
 
+struct My {
+	int hp;
+	int camp;
+	float word[3];//世界坐标
+	float screen[2];//屏幕坐标
+	float matrix[4][4];//本人矩阵
+}my;
+
+
+namespace matrix {
+	void GetDistance(float enemyWorld[3], float myWorld[3], float enemyScreen[2], float* distance) {
+		//判断是否在屏幕内 
+		if ((enemyScreen[0] > 0 && enemyScreen[0] < winRect.right - winRect.left) &&
+			(enemyScreen[1] > 0 && enemyScreen[1] < winRect.bottom - winRect.top))
+		{
+			/**distance = fabs(enemyX - ((winRect.right - winRect.left) / 2)) +
+				fabs(enemyY - ((winRect.bottom - winRect.top) / 2));*/
+				/*求三维坐标之间的距离*/
+			*distance = sqrt((enemyWorld[0] - myWorld[0]) * (enemyWorld[0] - myWorld[0]) + (enemyWorld[1] - myWorld[1]) * (enemyWorld[1] - myWorld[1]) + (enemyWorld[2] - myWorld[2]) * (enemyWorld[2] - myWorld[2]));
+		}
+		else
+		{
+			*distance = 999999.0f;
+		}
+
+	}
 	DWORD GetProcessID(const char* processName) {
 		/*
 		* 创建进程快照
@@ -58,7 +101,25 @@ namespace matrix {
 		return FALSE;
 
 	}
-
+	BOOL WordToScreen(float pos[3], Vctors2& Screen)
+	{
+		GetWindowRect(window, &winRect);
+	/*cout << winRect.left << winRect.top << winRect.bottom << winRect.right << endl;*/
+		winRect.top += 25;
+		//计算与玩家的相机比较的角度。
+		float w = my.matrix[3][0] * pos[0] + my.matrix[3][1] * pos[1] + my.matrix[3][2] * pos[2] + my.matrix[3][3]; //Calculate the angle in compareson to the player's camera.
+		if (w > 0.001) //如果对象在视图中.
+		{
+			
+			Screen.Distance = w / 100;
+			Screen.x = ((winRect.right - winRect.left) / 2) + (0.5f * ((my.matrix[0][0] * pos[0] + my.matrix[0][1] * pos[1] + my.matrix[0][2] * pos[2] + my.matrix[0][3]) * Screen.Distance) * (winRect.right - winRect.left) + 0.5f);
+			Screen.y = ((winRect.bottom - winRect.top) / 2) - (0.5f * ((my.matrix[1][0] * pos[0] + my.matrix[1][1] * pos[1] + my.matrix[1][2] * pos[2] + my.matrix[1][3]) * Screen.Distance) * (winRect.bottom - winRect.top) + 0.5f);
+			Screen.BoxHeight = w - Screen.y;
+			Screen.BoxWidth = Screen.BoxHeight / 2;
+			return true;
+		}
+		return false;
+	}
 	HMODULE GetProcessModuleHandle(DWORD pid, CONST TCHAR* moduleName) {	// 根据 PID 、模块名（需要写后缀，如：".dll"），获取模块入口地址。
 	MODULEENTRY32 moduleEntry;
 	HANDLE handle = NULL;
@@ -81,44 +142,49 @@ namespace matrix {
 }
 	void  GetRoleInfo() {
 			int sum;//玩家数量
-			int serverOffsetAddres;//偏移地址
+			int PersonAddres;//偏移地址
 			int clientOffsetAddres;//服务端偏移
 			int clientOffsetAddres2;
 			int camp;//玩家阵营
 			int count=0;//统计敌人数量
 			float distance= 999999.0f;
-
+			ImVec4 colf = ImVec4(1.0f, 1.0f, 0.4f, 1.0f);
+			const ImU32 col = ImColor(colf);
 			//获取当前房间人物数量
 			ReadProcessMemory(hProcess, (LPCVOID)((int)hMoudle[0] + 0x9E01AC), &sum, 4, NULL);// 0 server 1 engine 2client
 			if (sum==0){return;}
 			ImGui::Text(u8"房间人数%d", sum);
 			/*读取本人阵营以及世界坐标*/
-			ReadProcessMemory(hProcess, (LPCVOID)((int)hMoudle[0] + 0xA81884), &serverOffsetAddres, 4, NULL);//本人地址
-			printf("本人地址%d", serverOffsetAddres);
-			//ReadProcessMemory(hProcess, (LPCVOID)(serverOffsetAddres + 0x314), &my.camp, 4, NULL);
-			//ReadProcessMemory(hProcess, (LPCVOID)(serverOffsetAddres + 0x1dc), &my.word, 16, NULL);
-			///*读取本人矩阵*/
-			//ReadProcessMemory(hProcess, (LPCVOID)((int)hMoudle[2] + 0x4D94C04), &my.matrix, 64, NULL);
+			ReadProcessMemory(hProcess, (LPCVOID)((int)hMoudle[0] + 0x00939D34), &PersonAddres, 4, NULL);//自己地址
+			ImGui::Text(u8"自己地址%x", PersonAddres);
+			//ReadProcessMemory(hProcess, (LPCVOID)(PersonAddres + 0x314), &my.camp, 4, NULL);//本人阵营
+		//	ImGui::Text(u8"本人阵营%d", my.camp);
+			//ReadProcessMemory(hProcess, (LPCVOID)(PersonAddres + 0x1d8), &my.word, 12, NULL);//本人x
+			//ImGui::Text(u8"本人x%f", my.word[0]);
+		
+			ReadProcessMemory(hProcess, (LPCVOID)((int)hMoudle[1] + 0x75038C), &my.matrix, 64, NULL);	//*读取本人矩阵*/
 			//
 			///*读取敌人信息 并转换为屏幕坐标*/
-			//for (int i = 1; i < sum; i++) {
-			//	ReadProcessMemory(hProcess, (LPCVOID)((int)hMoudle[0] + (0xA81884 + 0x18 * i)), &serverOffsetAddres, 4, NULL);
-			//	ReadProcessMemory(hProcess, (LPCVOID)(serverOffsetAddres + 0x314), &camp, 4, NULL);
-			//	if (camp != my.camp)
-			//	{
-			//		ReadProcessMemory(hProcess, (LPCVOID)(serverOffsetAddres + 0x1dc), &enemyArray[count].word, 12, NULL);
-			//		ReadProcessMemory(hProcess, (LPCVOID)(serverOffsetAddres + 0x230), &enemyArray[count].hp, 4, NULL);
-			//		ReadProcessMemory(hProcess, (LPCVOID)((int)hMoudle[2] + (0x4DA31EC + 0x10 * count)), &clientOffsetAddres, 4, NULL);
-			//		ReadProcessMemory(hProcess, (LPCVOID)(clientOffsetAddres + 0x26A8), &clientOffsetAddres2, 4, NULL);
-			//		ReadProcessMemory(hProcess, (LPCVOID)(clientOffsetAddres2+0x18C), &enemyArray[count].headBoneWord[0], 4, NULL);
-			//		ReadProcessMemory(hProcess, (LPCVOID)(clientOffsetAddres2+0x19C), &enemyArray[count].headBoneWord[1], 4, NULL);
-			//		ReadProcessMemory(hProcess, (LPCVOID)(clientOffsetAddres2+0x1AC), &enemyArray[count].headBoneWord[2], 4, NULL);
-			//		WordToScreen(enemyArray[count].word, enemyArray[count].screen);
-			//		WordToScreen(enemyArray[count].headBoneWord, enemyArray[count].headBoneScreen);
-			//		count++;
-			//	}
-			//}
+			for (int i = 1; i < sum; i++) {
+				ReadProcessMemory(hProcess, (LPCVOID)((int)hMoudle[0] + (0x00939D34 + 0x18 * i)), &PersonAddres, 4, NULL);
+				
+				ReadProcessMemory(hProcess, (LPCVOID)(PersonAddres + 0x314), &camp, 4, NULL);//阵营
+				ReadProcessMemory(hProcess, (LPCVOID)(PersonAddres + 0x1d8), &personArray[i].pos, 12, NULL);//坐标
+				ReadProcessMemory(hProcess, (LPCVOID)(PersonAddres + 0x21c), &personArray[i].hp, 4, NULL);//血量
+				ImGui::Text(u8"PersonAddres=%x,阵营=%d,坐标x=%f,坐标y=%f,坐标z=%f", PersonAddres, camp,personArray[i].pos[0], personArray[i].pos[1], personArray[i].pos[2]);
+				ImGui::Text(u8"血量%d", personArray[i].hp);
+				WordToScreen(personArray[i].pos, personArray[i].screen);
+				ImGui::Text(u8"X=%f,X=%f", personArray[i].screen.x, personArray[i].screen.y);
+				//WordToScreen(enemyArray[count].headBoneWord, enemyArray[count].headBoneScreen);
+				
+			}
 		
+			for (int i = 0; i < sum; i++) {
+
+				personArray[i].screen;
+				draw_list->AddRect(ImVec2(personArray[i].screen.x, personArray[i].screen.x+ personArray[i].screen.BoxWidth), ImVec2(personArray[i].screen.y, personArray[i].screen.y + personArray[i].screen.BoxHeight), col, 0.0f, 0, 3.0f);
+
+			}
 			///*cout << count << endl;*/
 			//if (GetForegroundWindow() == hWnd ) {
 			//	//方框范围
@@ -179,13 +245,32 @@ namespace matrix {
 			//}
 			//
 		}
+	BOOL CALLBACK EnumWindowsCallback(HWND handle, LPARAM lParam)
+	{
+		DWORD wndProcId;
+		GetWindowThreadProcessId(handle, &wndProcId);
+
+		if (GetCurrentProcessId() != wndProcId)
+			return TRUE; // skip to next window
+
+		window = handle;
+		return FALSE; // window found abort search
+	}
+
+	HWND GetProcessWindow()
+	{
+		window = NULL;
+		EnumWindows(EnumWindowsCallback, NULL);
+		return window;
+	}
 	BOOL InitData() {
 		processID = GetProcessID("csgo.exe");
 		printf("游戏进程ID:%d\n", processID);
 		if (processID) {
-			hWnd = FindWindow(NULL, "Counter-Strike: Global Offensive");
+			GetProcessWindow();
+		//	hWnd = FindWindow(NULL, "Counter-Strike: Global Offensive");
 			//printf("窗口句柄:%d\n", (int)hWnd);
-			GetWindowRect(hWnd, &winRect);
+			
 		//	printf("窗口分辨率:%d,%d\n", winRect.right - winRect.left, winRect.bottom - winRect.top);
 			hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processID);
 			hMoudle[0] = GetProcessModuleHandle(processID, "server.dll");
@@ -203,36 +288,37 @@ namespace matrix {
 		}
 		return FALSE;
 	}
+	
 }
 
 namespace MyImgui {
 
 	void LoadMyWin()
 	{
-		ImDrawList* draw_list = ImGui::GetForegroundDrawList();
 
+
+		draw_list = ImGui::GetForegroundDrawList();
 		ImGui_ImplDX9_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
 		ImGui::Begin(u8"游戏辅助");
-		ImGui::SetWindowSize(ImVec2(200, 300), 0);
-		ImGui::Text(u8"窗口句柄%d", hWnd);
-		ImGui::Text(u8"进程ID%d", processID);
-		ImGui::Text(u8"窗口分辨率:%d,%d\n", winRect.right - winRect.left, winRect.bottom - winRect.top);
-		ImGui::Text(u8"server%d", hMoudle[0]);
-		ImGui::Text(u8"engine%d", hMoudle[1]);
-		ImGui::Text(u8"client%d", hMoudle[2]);
-		ImGui::GetID("游戏辅助");
-		ImGui::OpenPopup("游戏辅助");
-		HWND iwn = GetTopWindow(hWnd);
-		ImGui::Text(u8"游戏辅助-%d", iwn);
-		ShowWindow(iwn, 0);
+		//ImGui::SetWindowSize(ImVec2(200, 300), 0);
+		//ImGui::Text(u8"窗口句柄%d", window);
+		//ImGui::Text(u8"进程ID%d", processID);
+		//ImGui::Text(u8"窗口分辨率:%d,%d\n", winRect.right - winRect.left, winRect.bottom - winRect.top);
+		//ImGui::Text(u8"server%d", hMoudle[0]);
+		//ImGui::Text(u8"engine%d", hMoudle[1]);
+		//ImGui::Text(u8"client%d", hMoudle[2]);
+		//ImGui::GetID("游戏辅助");
+		//ImGui::OpenPopup("游戏辅助");
+	//	HWND iwn = GetTopWindow(window);
+	//	ImGui::Text(u8"游戏辅助-%d", iwn);
+		//ShowWindow(iwn, 0);
 		matrix::GetRoleInfo();
 		ImGui::End();
 		ImGui::EndFrame();
 		ImGui::Render();
-
 		ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
 
 	}
@@ -258,6 +344,7 @@ void initialize_imgui(IDirect3DDevice9* directdevice9)
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\simhei.ttf", 15.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
 	io.IniFilename = nullptr;
+	io.ConfigFlags = ImGuiConfigFlags_NoMouseCursorChange;
 	io.LogFilename = nullptr;
 	ImGui_ImplWin32_Init(FindWindow(WindowClass, nullptr));
 	ImGui_ImplDX9_Init(directdevice9);
@@ -273,22 +360,22 @@ LRESULT CALLBACK self_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 HRESULT __stdcall self_EndScene(IDirect3DDevice9* directdevice9)
 {
-	static bool first_call = true;
+	
 	if (first_call)
 	{
-
 		first_call = false;
 		initialize_imgui(directdevice9);
 		g_original_proc = (WNDPROC)SetWindowLongA(FindWindow(WindowClass, nullptr), GWL_WNDPROC, (LONG)self_proc);
 		matrix::InitData();
 	}
+	if (GetAsyncKeyState(VK_HOME) & 1)
+	{
+		show = !show;
+	}
 
-	//printf("进入end函数\n");
 
-	
 	g_EndScene_hook->restore_address();
-
-	MyImgui::LoadMyWin();
+	if (show){MyImgui::LoadMyWin();}
 
 	HRESULT result = directdevice9->EndScene();
 	g_EndScene_hook->motify_address();
